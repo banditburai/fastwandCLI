@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"fastwand/internal/ui"
@@ -25,16 +26,21 @@ This command is meant for production use.`,
 			directory = args[0]
 		}
 
+		// Convert to absolute path
+		absPath, err := filepath.Abs(directory)
+		if err != nil {
+			fmt.Println(utils.ErrorStyle.Render(err.Error()))
+			os.Exit(1)
+		}
+
 		// Start spinner
 		p := tea.NewProgram(ui.NewSpinner("Starting development server..."))
 
 		// Start the Python process
 		pythonCmd := exec.Command("python", "-c", fmt.Sprintf(`
-import sys
-sys.path.append("%s")
-from cli import run_command
-run_command("%s")
-		`, directory, directory))
+		from fastwand.cli import run_command
+		run_command("%s")
+		`, absPath))
 
 		stdout, err := pythonCmd.StdoutPipe()
 		if err != nil {

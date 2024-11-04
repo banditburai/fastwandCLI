@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"fastwand/internal/ui"
@@ -24,16 +25,21 @@ var watchCmd = &cobra.Command{
 			directory = args[0]
 		}
 
+		// Get absolute path
+		absPath, err := filepath.Abs(directory)
+		if err != nil {
+			fmt.Println(utils.ErrorStyle.Render(err.Error()))
+			os.Exit(1)
+		}
+
 		// Start spinner
 		p := tea.NewProgram(ui.NewSpinner("Starting watch process..."))
 
 		// Start the Python process
 		pythonCmd := exec.Command("python", "-c", fmt.Sprintf(`
-import sys
-sys.path.append("%s")
-from cli import watch_command
+from fastwand.cli import watch_command
 watch_command("%s")
-		`, directory, directory))
+		`, absPath))
 
 		stdout, err := pythonCmd.StdoutPipe()
 		if err != nil {
