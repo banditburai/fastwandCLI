@@ -1,52 +1,72 @@
 package cmd
 
 import (
-	"fastwand/internal/utils"
+	"bufio"
+	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
-	"runtime"
+	"strings"
 
+	"fastwand/internal/ui"
+	"fastwand/internal/utils"
+
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 )
 
 var watchCmd = &cobra.Command{
 	Use:   "watch [directory]",
-	Short: "Start Tailwind watch mode for development",
-	Long: `Start Tailwind CSS in watch mode for development.
-This will watch your input CSS file and rebuild on changes.
-Run 'python main.py' in a separate terminal to start the server.`,
+	Short: "Watch for changes and rebuild CSS",
+	Long:  `Start Tailwind in watch mode to automatically rebuild CSS when files change.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		directory := "."
 		if len(args) > 0 {
 			directory = args[0]
 		}
 
-		// Check if tailwindcss exists
-		tailwindPath := filepath.Join(directory, "tailwindcss")
-		if runtime.GOOS == "windows" {
-			tailwindPath += ".exe"
+		// Start spinner
+		p := tea.NewProgram(ui.NewSpinner("Starting watch process..."))
+
+		// Start the Python process
+		pythonCmd := exec.Command("python", "-c", fmt.Sprintf(`
+import sys
+sys.path.append("%s")
+from cli import watch_command
+watch_command("%s")
+		`, directory, directory))
+
+		stdout, err := pythonCmd.StdoutPipe()
+		if err != nil {
+			fmt.Println(utils.ErrorStyle.Render(err.Error()))
+			os.Exit(1)
 		}
-		if _, err := os.Stat(tailwindPath); os.IsNotExist(err) {
-			utils.ErrorStyle.Render("Tailwind executable not found. Did you run 'fastwand init' first?")
-			return
+
+		if err := pythonCmd.Start(); err != nil {
+			fmt.Println(utils.ErrorStyle.Render(err.Error()))
+			os.Exit(1)
 		}
 
-		utils.InfoStyle.Render("Starting Tailwind watch mode...")
-		utils.InfoStyle.Render("\nNOTE: Run 'python main.py' in a separate terminal")
+		// Create a scanner to read Python output
+		scanner := bufio.NewScanner(stdout)
 
-		// Start watch process
-		watchCmd := exec.Command(tailwindPath,
-			"-i", "assets/input.css",
-			"-o", "assets/output.css",
-			"--watch")
-		watchCmd.Dir = directory
-		watchCmd.Stdout = os.Stdout
-		watchCmd.Stderr = os.Stderr
+		// Process status updates from Python
+		go func() {
+			for scanner.Scan() {
+				msg := scanner.Text()
+				switch {
+				case strings.HasPrefix(msg, "STATUS:"):
+					p.Send(strings.TrimPrefix(msg, "STATUS:"))
+				case strings.HasPrefix(msg, "ERROR:"):
+					p.Send(fmt.Errorf(strings.TrimPrefix(msg, "ERROR:")))
+				case strings.HasPrefix(msg, "DONE:"):
+					p.Send(true)
+				}
+			}
+		}()
 
-		if err := watchCmd.Run(); err != nil {
-			utils.ErrorStyle.Render("Error running Tailwind: " + err.Error())
-			return
+		if _, err := p.Run(); err != nil {
+			fmt.Println(utils.ErrorStyle.Render(err.Error()))
+			os.Exit(1)
 		}
 	},
 }

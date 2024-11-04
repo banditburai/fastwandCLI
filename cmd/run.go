@@ -1,14 +1,16 @@
 package cmd
 
 import (
-	"fastwand/internal/utils"
+	"bufio"
+	"fmt"
 	"os"
 	"os/exec"
-	"os/signal"
-	"path/filepath"
-	"runtime"
-	"syscall"
+	"strings"
 
+	"fastwand/internal/ui"
+	"fastwand/internal/utils"
+
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 )
 
@@ -23,60 +25,49 @@ This command is meant for production use.`,
 			directory = args[0]
 		}
 
-		// Check if tailwindcss exists
-		tailwindPath := filepath.Join(directory, "tailwindcss")
-		if runtime.GOOS == "windows" {
-			tailwindPath += ".exe"
-		}
-		if _, err := os.Stat(tailwindPath); os.IsNotExist(err) {
-			utils.ErrorStyle.Render("Tailwind executable not found. Did you run 'fastwand init' first?")
-			return
-		}
+		// Start spinner
+		p := tea.NewProgram(ui.NewSpinner("Starting development server..."))
 
-		// Build CSS
-		utils.InfoStyle.Render("Building CSS...")
-		buildCmd := exec.Command(tailwindPath,
-			"-i", "assets/input.css",
-			"-o", "assets/output.css",
-			"--minify")
-		buildCmd.Dir = directory
-		buildCmd.Stdout = os.Stdout
-		buildCmd.Stderr = os.Stderr
+		// Start the Python process
+		pythonCmd := exec.Command("python", "-c", fmt.Sprintf(`
+import sys
+sys.path.append("%s")
+from cli import run_command
+run_command("%s")
+		`, directory, directory))
 
-		if err := buildCmd.Run(); err != nil {
-			utils.ErrorStyle.Render("Error building CSS: " + err.Error())
-			return
+		stdout, err := pythonCmd.StdoutPipe()
+		if err != nil {
+			fmt.Println(utils.ErrorStyle.Render(err.Error()))
+			os.Exit(1)
 		}
 
-		utils.SuccessStyle.Render("CSS built successfully!")
-
-		// Start Python server
-		utils.InfoStyle.Render("Starting server...")
-		serverCmd := exec.Command("python", "main.py")
-		serverCmd.Dir = directory
-		serverCmd.Stdout = os.Stdout
-		serverCmd.Stderr = os.Stderr
-
-		// Set up signal handling
-		sigChan := make(chan os.Signal, 1)
-		signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
-
-		if err := serverCmd.Start(); err != nil {
-			utils.ErrorStyle.Render("Error starting server: " + err.Error())
-			return
+		if err := pythonCmd.Start(); err != nil {
+			fmt.Println(utils.ErrorStyle.Render(err.Error()))
+			os.Exit(1)
 		}
 
-		// Wait for either server completion or interrupt
+		// Create a scanner to read Python output
+		scanner := bufio.NewScanner(stdout)
+
+		// Process status updates from Python
 		go func() {
-			<-sigChan
-			utils.InfoStyle.Render("\nShutting down server...")
-			serverCmd.Process.Signal(os.Interrupt)
+			for scanner.Scan() {
+				msg := scanner.Text()
+				switch {
+				case strings.HasPrefix(msg, "STATUS:"):
+					p.Send(strings.TrimPrefix(msg, "STATUS:"))
+				case strings.HasPrefix(msg, "ERROR:"):
+					p.Send(fmt.Errorf(strings.TrimPrefix(msg, "ERROR:")))
+				case strings.HasPrefix(msg, "DONE:"):
+					p.Send(true)
+				}
+			}
 		}()
 
-		if err := serverCmd.Wait(); err != nil {
-			if err.Error() != "signal: interrupt" {
-				utils.ErrorStyle.Render("Error running server: " + err.Error())
-			}
+		if _, err := p.Run(); err != nil {
+			fmt.Println(utils.ErrorStyle.Render(err.Error()))
+			os.Exit(1)
 		}
 	},
 }

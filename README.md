@@ -83,7 +83,7 @@ FastWand builds upon and is inspired by several excellent projects:
 
 - [FastHTML](https://github.com/answerDotAI/fasthtml/) - The core HTML framework that FastWand is built to support
 - [Tailwind CSS](https://github.com/tailwindlabs/tailwindcss) - The utility-first CSS framework that powers our styling
-- [Tailwind CLI Extra](https://github.com/dobicinaitis/tailwind-cli-extra) - Pre-bundled Tailwind CLI with DaisyUI support, which we use for binary distribution
+- [Tailwind CLI Extra](https://github.com/dobicinaitis/tailwind-cli-extra) - Pre-bundled Tailwind CLI with DaisyUI plugin, which we use for binary distribution
 
 
 ## License
