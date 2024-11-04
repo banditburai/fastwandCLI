@@ -1,0 +1,44 @@
+name: Release Go 🐬 into the wild
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build Release Assets
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.22.5' 
+          
+      - name: Display Go version
+        run: go version
+          
+      - name: Build binaries
+        run: |
+          mkdir -p release/
+          VERSION=$(cat internal/version/version.go | grep "Version =" | cut -d '"' -f 2)
+          FLAGS="-X 'fastwand/internal/version.Version=$VERSION'"
+          GOOS=linux GOARCH=amd64 go build -ldflags="$FLAGS" -o release/fastwand-linux-x64
+          GOOS=linux GOARCH=arm64 go build -ldflags="$FLAGS" -o release/fastwand-linux-arm64
+          GOOS=darwin GOARCH=amd64 go build -ldflags="$FLAGS" -o release/fastwand-macos-x64
+          GOOS=darwin GOARCH=arm64 go build -ldflags="$FLAGS" -o release/fastwand-macos-arm64
+          GOOS=windows GOARCH=amd64 go build -ldflags="$FLAGS" -o release/fastwand-windows-x64.exe
+          
+      - name: List built executables
+        run: ls -l release/
+          
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: release/fastwand-*
+          generate_release_notes: true
