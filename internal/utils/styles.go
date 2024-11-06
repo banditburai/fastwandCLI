@@ -50,4 +50,11 @@ var (
 	// Help text style
 	HelpStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#666666"))
+
+	// URL hint style
+	URLHintStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#01FAC6")).
+			Padding(0, 1).
+			Width(50).
+			Align(lipgloss.Center)
 )

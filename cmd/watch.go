@@ -48,8 +48,9 @@ func runTailwind(directory, tailwindPath string, outputChan chan<- ui.TailwindOu
 	watchCmd.Stdout = writeWrapper{outputChan, directory}
 	watchCmd.Stderr = writeWrapper{outputChan, directory}
 
-	// Start the command
+	// Set up process group handling
 	pm.SetupCmd(watchCmd)
+	pm.SetTailwindCmd(watchCmd)
 
 	if err := watchCmd.Start(); err != nil {
 		outputChan <- ui.TailwindOutputMsg(fmt.Sprintf("Watch process error: %v", err))
@@ -107,7 +108,9 @@ uvicorn.run(
 )`)
 	cmd.Dir = directory
 
+	// Set up process group handling
 	pm.SetupCmd(cmd)
+	pm.SetPythonCmd(cmd)
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -149,7 +152,12 @@ uvicorn.run(
 	}()
 
 	<-done
-	cmd.Process.Kill()
+	// Use our process manager's kill method instead of direct Process.Kill
+	if pgid := pm.GetProcessGroupID(cmd); pgid != 0 {
+		pm.KillProcessGroup(pgid)
+	} else {
+		cmd.Process.Kill()
+	}
 	cmd.Wait()
 }
 

@@ -25,7 +25,13 @@ func (pm *Manager) Cleanup() {
 	// Helper function to gracefully terminate a process
 	cleanup := func(cmd *exec.Cmd) {
 		if cmd != nil && cmd.Process != nil {
-			// Give the process a chance to exit gracefully
+			// Get process group ID and send SIGTERM
+			pgid := pm.GetProcessGroupID(cmd)
+			if pgid != 0 {
+				pm.TerminateProcessGroup(pgid)
+			}
+
+			// Give it a moment to cleanup
 			done := make(chan error)
 			go func() {
 				done <- cmd.Wait()
@@ -34,8 +40,11 @@ func (pm *Manager) Cleanup() {
 			// Wait for process to exit or timeout
 			select {
 			case <-time.After(1000 * time.Millisecond):
-				// Force kill if still running
-				pm.KillProcess(cmd)
+				// Force kill the process group if still running
+				if pgid != 0 {
+					pm.KillProcessGroup(pgid)
+				}
+				cmd.Process.Kill()
 				// Wait for the process to actually terminate
 				cmd.Wait()
 			case <-done:

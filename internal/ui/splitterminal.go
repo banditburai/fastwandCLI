@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fastwand/internal/process"
+	"fastwand/internal/utils"
 	"time"
 
 	"github.com/charmbracelet/bubbles/viewport"
@@ -16,6 +17,7 @@ type WatchModel struct {
 	height         int
 	focused        string // "left" or "right"
 	processManager *process.Manager
+	appURL         string
 }
 
 type TerminalView struct {
@@ -37,6 +39,7 @@ func NewWatchModel() *WatchModel {
 			color:    "#04B575",
 		},
 		focused: "left",
+		appURL:  "http://localhost:5001", // Default URL
 	}
 }
 
@@ -50,13 +53,18 @@ func (m *WatchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		// Update viewport sizes
+
+		// Calculate available height (accounting for URL hint and help text)
+		availHeight := m.height - 4
+
+		// Calculate width for each pane (accounting for margins and borders)
 		halfWidth := (m.width / 2) - 4
-		viewHeight := m.height - 4
+
+		// Update viewport sizes
 		m.leftView.viewport.Width = halfWidth
-		m.leftView.viewport.Height = viewHeight
+		m.leftView.viewport.Height = availHeight - 4 // Account for borders and padding
 		m.rightView.viewport.Width = halfWidth
-		m.rightView.viewport.Height = viewHeight
+		m.rightView.viewport.Height = availHeight - 4
 	case TailwindOutputMsg:
 		// Initialize content if empty
 		currentContent := m.leftView.viewport.View()
@@ -86,11 +94,19 @@ func (m *WatchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *WatchModel) View() string {
-	halfWidth := m.width/2 - 2
+	// URL hint at the top
+	urlHint := utils.URLHintStyle.Render("App is running at " + m.appURL)
+
+	// Calculate available height (subtract URL hint and help text)
+	availHeight := m.height - 4
+
+	// Calculate width for each pane with balanced margins
+	halfWidth := (m.width - 12) / 2 // -12 for margins (3 left, 3 middle, 3 right)
 
 	// Create two independent terminal views with their own borders
 	leftStyle := lipgloss.NewStyle().
 		Width(halfWidth).
+		Height(availHeight).
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color(func() string {
 			if m.focused == "left" {
@@ -98,34 +114,39 @@ func (m *WatchModel) View() string {
 			}
 			return "#666666"
 		}())).
-		MarginRight(1)
+		MarginLeft(3). // Left margin
+		MarginRight(1) // Half of middle margin
 
 	rightStyle := lipgloss.NewStyle().
 		Width(halfWidth).
+		Height(availHeight).
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color(func() string {
 			if m.focused == "right" {
 				return "#04B575"
 			}
 			return "#666666"
-		}()))
+		}())).
+		MarginLeft(1). // Half of middle margin
+		MarginRight(3) // Right margin
 
-	// Create help text
+	// Help text
 	helpStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#666666")).
 		Align(lipgloss.Center).
 		Width(m.width)
 	helpText := helpStyle.Render("TAB to switch panes • ↑/↓ to scroll • q to quit")
 
-	// Join horizontally and vertically
+	// Join all components vertically
 	terminals := lipgloss.JoinHorizontal(
 		lipgloss.Top,
-		leftStyle.Render(m.leftView.View(halfWidth-2, m.height-2, m.focused == "left")),
-		rightStyle.Render(m.rightView.View(halfWidth-2, m.height-2, m.focused == "right")),
+		leftStyle.Render(m.leftView.View(halfWidth-2, availHeight-2, m.focused == "left")),
+		rightStyle.Render(m.rightView.View(halfWidth-2, availHeight-2, m.focused == "right")),
 	)
 
 	return lipgloss.JoinVertical(
 		lipgloss.Left,
+		urlHint,
 		terminals,
 		helpText,
 	)
