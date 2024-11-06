@@ -1,0 +1,20 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    @apply bg-surface-light;
+    color-scheme: light;    
+    overscroll-behavior-x: none;
+    overscroll-behavior-y: auto;    
+    touch-action: pan-y;
+    width: 100%;
+    overflow-x: hidden;
+  }
+
+  html.dark {
+    @apply bg-surface-dark;
+    color-scheme: dark;
+  }
+}

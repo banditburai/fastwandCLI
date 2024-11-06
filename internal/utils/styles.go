@@ -33,7 +33,9 @@ var (
 			Foreground(lipgloss.Color("#FF616E")).
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color("#FF616E")).
-			Padding(1)
+			Margin(1).
+			Padding(0, 1).
+			Width(50)
 
 	// Selected item style
 	SelectedStyle = lipgloss.NewStyle().

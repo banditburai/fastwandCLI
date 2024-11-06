@@ -118,6 +118,6 @@ func initProject(directory string, selectedFramework string) {
 	// Show next steps
 	fmt.Println(utils.InfoStyle.Render("\nNext steps:" +
 		"\n1. cd " + directory +
-		"\n2. fastwand watch - Watch for CSS changes (needs two terminals to run app)" +
+		"\n2. fastwand watch - Watch for CSS changes and run server" +
 		"\n3. fastwand run   - Minify CSS and serve app"))
 }

@@ -1,6 +1,9 @@
 package utils
 
 import (
+	"fmt"
+	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 )
@@ -31,4 +34,36 @@ func GetSystemInfo() SystemInfo {
 		Arch:        machine,
 		FormattedOS: formattedOS,
 	}
+}
+
+func GetTailwindPath(directory string) (string, error) {
+	// Get path in same format as download function
+	tailwindPath := filepath.Join(directory, "tailwindcss")
+	if runtime.GOOS == "windows" {
+		tailwindPath += ".exe"
+	}
+
+	// Get absolute path first, just like in init
+	absPath, err := filepath.Abs(tailwindPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to get absolute path: %w", err)
+	}
+
+	// Check if file exists and is executable, matching init's check
+	if _, err := os.Stat(absPath); err != nil {
+		return "", fmt.Errorf("tailwind binary not found in %s: %w", directory, err)
+	}
+
+	// Check if file is executable on Unix systems
+	if runtime.GOOS != "windows" {
+		info, err := os.Stat(absPath)
+		if err != nil {
+			return "", fmt.Errorf("failed to check file permissions: %w", err)
+		}
+		if info.Mode()&0111 == 0 {
+			return "", fmt.Errorf("tailwind binary is not executable")
+		}
+	}
+
+	return absPath, nil
 }
