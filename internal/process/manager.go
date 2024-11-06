@@ -2,7 +2,6 @@ package process
 
 import (
 	"os/exec"
-	"syscall"
 	"time"
 )
 
@@ -26,14 +25,7 @@ func (pm *Manager) Cleanup() {
 	// Helper function to gracefully terminate a process
 	cleanup := func(cmd *exec.Cmd) {
 		if cmd != nil && cmd.Process != nil {
-			// Get process group ID before sending signals
-			pgid, err := syscall.Getpgid(cmd.Process.Pid)
-			if err == nil {
-				// Send SIGTERM to process group
-				syscall.Kill(-pgid, syscall.SIGTERM)
-			}
-
-			// Give it a moment to cleanup
+			// Give the process a chance to exit gracefully
 			done := make(chan error)
 			go func() {
 				done <- cmd.Wait()
@@ -42,11 +34,8 @@ func (pm *Manager) Cleanup() {
 			// Wait for process to exit or timeout
 			select {
 			case <-time.After(1000 * time.Millisecond):
-				// Force kill the process group if still running
-				if pgid != 0 {
-					syscall.Kill(-pgid, syscall.SIGKILL)
-				}
-				cmd.Process.Kill()
+				// Force kill if still running
+				pm.KillProcess(cmd)
 				// Wait for the process to actually terminate
 				cmd.Wait()
 			case <-done:
@@ -55,7 +44,7 @@ func (pm *Manager) Cleanup() {
 		}
 	}
 
-	// Clean up both processes with longer timeout
+	// Clean up both processes
 	cleanup(pm.PythonCmd)
 	cleanup(pm.TailwindCmd)
 

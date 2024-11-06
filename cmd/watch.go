@@ -49,8 +49,7 @@ func runTailwind(directory, tailwindPath string, outputChan chan<- ui.TailwindOu
 	watchCmd.Stderr = writeWrapper{outputChan, directory}
 
 	// Start the command
-	watchCmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	pm.SetTailwindCmd(watchCmd)
+	pm.SetupCmd(watchCmd)
 
 	if err := watchCmd.Start(); err != nil {
 		outputChan <- ui.TailwindOutputMsg(fmt.Sprintf("Watch process error: %v", err))
@@ -107,9 +106,8 @@ uvicorn.run(
 	reload_includes=["*.py", "static/css/output.css"]
 )`)
 	cmd.Dir = directory
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
-	pm.SetPythonCmd(cmd)
+	pm.SetupCmd(cmd)
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
